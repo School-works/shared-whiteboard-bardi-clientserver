@@ -34,7 +34,8 @@ public class Server {
         whiteboard.remove(message);
     }
 
-    public static String listMessages(List<Message> whiteboard) {
+    public static String listMessages(List<Message> whiteboard) { // metto gli elementi dentro la whiteboard in una
+                                                                  // stringa così da poter essere ritornata più facilmente e più comprensibilmente
         String totalWhiteboard = "";
 
         for (int i = 0; i < whiteboard.size(); i++) {
@@ -42,6 +43,30 @@ public class Server {
                     + whiteboard.get(i).getText() + totalWhiteboard;
         }
         return totalWhiteboard;
+    }
+
+    public static boolean stringElementAlreadyExistsIn(ArrayList<String> list) { // semplice controllo su stringhe in una lista
+        String temp = "";
+        for (int i = 0; i < list.size(); i++) {
+            if (temp == list.get(i)) {
+                return true;
+            } else {
+                temp = list.get(i);
+            }
+        }
+        return false;
+    }
+
+    public static boolean integerElementAlreadyExistsIn(ArrayList<Integer> list) { // uguale ma adattato per interi
+        Integer temp = -1;
+        for (int i = 0; i < list.size(); i++) {
+            if (temp == list.get(i)) {
+                return true;
+            } else {
+                temp = list.get(i);
+            }
+        }
+        return false;
     }
 
     static class ClientHandler extends Thread {
@@ -57,15 +82,21 @@ public class Server {
                 BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
                 PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
                 out.println("WELCOME");
+                ArrayList users = new ArrayList<String>();
                 String login = in.readLine();
-                if (login != null) {
-                    out.println("OK");
+                if (login == null || stringElementAlreadyExistsIn(users)) { // se il login esiste oppure se qualcuno ha
+                                                                            // già fatto login con stesso nome ERR LOGINREQUIRED
+                    out.println("ERR LOGINREQUIRED");
                 } else {
+                    out.println("OK");
 
                 }
                 List<Message> whiteboard = Collections.synchronizedList(new ArrayList<>());
-                int id = 0;
+                ArrayList ids = new ArrayList<Integer>();
+                Integer id = 0;
+
                 while (login != null) {
+                    ids.add(id);
 
                     String response = in.readLine();
 
@@ -75,20 +106,42 @@ public class Server {
 
                     switch (command[0]) {
                         case "ADD":
-                            addMessage(message, whiteboard);
-                            out.println("OK ADDED" + id);
-                            id++;
+                            if (command[1].isEmpty()) { // se la length == 0 vuol dire che non c'è nulla, quindi ERR SYNTAX
+                                out.println("ERR SYNTAX");
+                            } else {
+                                addMessage(message, whiteboard);
+                                out.println("OK ADDED" + id);
+                                id++;
+                            }
+
                             break;
                         case "LIST":
-                            out.println(listMessages(whiteboard));
+                            String totalMes = listMessages(whiteboard);
+                            if (totalMes.isEmpty()) { // se la length == 0 vuol dire che non c'è nulla, quindi la
+                                                      // whiteboard è vuote e quindi BOARD: END
+                                out.println("BOARD: END");
+                            } else {
+                                out.println(listMessages(whiteboard));
+
+                            }
                             break;
                         case "DEL":
-                            delMessage(message, whiteboard);
-                            out.println("OK DELETED");
+                            if (command[1].isEmpty()) { // se la length == 0 vuol dire che non c'è nulla, quindi ERR SYNTAX
+                                out.println("ERR SYNTAX");
+                            } else if (integerElementAlreadyExistsIn(ids)) {
+                                out.println("ERR NOTFOUND");
+                            } else {
+
+                                delMessage(message, whiteboard);
+                                out.println("OK DELETED");
+                            }
                             break;
                         case "QUIT":
                             out.println("BYE");
                             clientSocket.close();
+                            break;
+                        default:
+                            out.println("ERR UNKNOWNCMD"); // se nessuno dei comandi listati è inserito:
                             break;
                     }
 

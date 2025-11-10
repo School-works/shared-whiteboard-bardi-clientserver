@@ -40,18 +40,20 @@ public class Client {
                 if (command.startsWith("ADD")) {
                     String response = in.readLine();
                     System.out.println(response);
+                    
                 } else if (command.equals("LIST")) {
                     String messages = in.readLine();
                     System.out.println("Lavagna:\n" + messages);
+
                 } else if (command.startsWith("DEL")) {
                     String response = in.readLine();
                     System.out.println(response);
+
                 } else if (command.equals("QUIT")) {
                     String response = in.readLine();
                     System.out.println(response);
                     break;
-                } else {
-                    System.out.println("Comando non valido.");
+
                 }
             }
 
