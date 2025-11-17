@@ -22,13 +22,17 @@ public class Client {
             String welcomeMessage = in.readLine();
             System.out.println(welcomeMessage);
 
-            System.out.print("Inserire login ");
+            // Login
+            System.out.print("Inserire login: ");
             String login = scanner.nextLine();
             out.println(login);
 
             String serverResponse = in.readLine();
-            if (serverResponse.equals("OK")) {
+            if ("OK".equals(serverResponse)) {
                 System.out.println("Login eseguito con successo!");
+            } else {
+                System.out.println("Errore nel login: " + serverResponse);
+                return; // uscita se login fallito
             }
 
             String command;
@@ -38,22 +42,43 @@ public class Client {
                 out.println(command);
 
                 if (command.startsWith("ADD")) {
+                    // aspetta la risposta del server dopo aver mandato un messaggio
                     String response = in.readLine();
-                    System.out.println(response);
-                    
+                    if (response.startsWith("OK ADDED")) {
+                        System.out.println("Messaggio aggiunto con ID: " + response.split(" ")[2]);
+                    } else {
+                        System.out.println("Errore nell'aggiunta del messaggio: " + response);
+                    }
+
                 } else if (command.equals("LIST")) {
-                    String messages = in.readLine();
-                    System.out.println("Lavagna:\n" + messages);
+                    // aspetta la risposta del server dopo aver richiesto la lista
+                    String response = in.readLine();
+                    if (response.startsWith("BOARD:")) {
+                        System.out.println("Lavagna:");
+                        String message;
+                        while (!(message = in.readLine()).equals("END")) {
+                            System.out.println(message);
+                        }
+                    } else {
+                        System.out.println("Errore nel recupero della lista: " + response);
+                    }
 
                 } else if (command.startsWith("DEL")) {
+                    // aspetta la risposta del server dopo aver cancellato un messaggio
                     String response = in.readLine();
-                    System.out.println(response);
+                    if (response.equals("OK DELETED")) {
+                        System.out.println("Messaggio cancellato con successo.");
+                    } else {
+                        System.out.println("Errore nella cancellazione del messaggio: " + response);
+                    }
 
                 } else if (command.equals("QUIT")) {
                     String response = in.readLine();
                     System.out.println(response);
                     break;
 
+                } else {
+                    System.out.println("Comando non valido. Riprova.");
                 }
             }
 

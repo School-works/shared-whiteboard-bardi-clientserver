@@ -23,54 +23,32 @@ public class Server {
         } catch (IOException e) {
             e.printStackTrace();
         }
-
     }
 
     public static void addMessage(Message message, List<Message> whiteboard) {
         whiteboard.add(message);
     }
 
-    public static void delMessage(Message message, List<Message> whiteboard) {
-        whiteboard.remove(message);
+    public static void delMessage(int messageId, List<Message> whiteboard) {
+        whiteboard.removeIf(message -> message.getId() == messageId);
     }
 
-    public static String listMessages(List<Message> whiteboard) { // metto gli elementi dentro la whiteboard in una
-                                                                  // stringa così da poter essere ritornata più facilmente e più comprensibilmente
-        String totalWhiteboard = "";
+    public static String listMessages(List<Message> whiteboard) {
+        StringBuilder totalWhiteboard = new StringBuilder();
 
-        for (int i = 0; i < whiteboard.size(); i++) {
-            totalWhiteboard = "[" + whiteboard.get(i).getId() + "] " + whiteboard.get(i).getAuthor() + ": "
-                    + whiteboard.get(i).getText() + totalWhiteboard;
+        for (Message message : whiteboard) {
+            totalWhiteboard.append("[").append(message.getId()).append("] ")
+                           .append(message.getAuthor()).append(": ")
+                           .append(message.getText()).append("\n");
         }
-        return totalWhiteboard;
-    }
-
-    public static boolean stringElementAlreadyExistsIn(ArrayList<String> list) { // semplice controllo su stringhe in una lista
-        String temp = "";
-        for (int i = 0; i < list.size(); i++) {
-            if (temp == list.get(i)) {
-                return true;
-            } else {
-                temp = list.get(i);
-            }
-        }
-        return false;
-    }
-
-    public static boolean integerElementAlreadyExistsIn(ArrayList<Integer> list) { // uguale ma adattato per interi
-        Integer temp = -1;
-        for (int i = 0; i < list.size(); i++) {
-            if (temp == list.get(i)) {
-                return true;
-            } else {
-                temp = list.get(i);
-            }
-        }
-        return false;
+        return totalWhiteboard.toString();
     }
 
     static class ClientHandler extends Thread {
         private Socket clientSocket;
+        private static List<String> loggedInUsers = Collections.synchronizedList(new ArrayList<>());
+        private static List<Message> whiteboard = Collections.synchronizedList(new ArrayList<>());
+        private static int lastMessageId = 0;
 
         public ClientHandler(Socket socket) {
             this.clientSocket = socket;
@@ -81,70 +59,85 @@ public class Server {
             try {
                 BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
                 PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
+                
                 out.println("WELCOME");
-                ArrayList users = new ArrayList<String>();
                 String login = in.readLine();
-                if (login == null || stringElementAlreadyExistsIn(users)) { // se il login esiste oppure se qualcuno ha
-                                                                            // già fatto login con stesso nome ERR LOGINREQUIRED
+                
+                if (login == null || loggedInUsers.contains(login)) {
                     out.println("ERR LOGINREQUIRED");
-                } else {
-                    out.println("OK");
-
+                    clientSocket.close();
+                    return;
                 }
-                List<Message> whiteboard = Collections.synchronizedList(new ArrayList<>());
-                ArrayList ids = new ArrayList<Integer>();
-                Integer id = 0;
 
-                while (login != null) {
-                    ids.add(id);
+                loggedInUsers.add(login);
+                out.println("OK");
 
-                    String response = in.readLine();
-
+                String response;
+                while ((response = in.readLine()) != null) {
                     String[] command = response.split(" ", 2);
+                    Message message = null;
 
-                    Message message = new Message(id, login, command[1]);
+                    if (command.length > 1) {
+                        message = new Message(lastMessageId, login, command[1]);
+                    }
 
                     switch (command[0]) {
                         case "ADD":
-                            if (command[1].isEmpty()) { // se la length == 0 vuol dire che non c'è nulla, quindi ERR SYNTAX
+                            if (command.length < 2 || command[1].isEmpty()) {
                                 out.println("ERR SYNTAX");
                             } else {
                                 addMessage(message, whiteboard);
-                                out.println("OK ADDED" + id);
-                                id++;
+                                out.println("OK ADDED " + lastMessageId);
+                                lastMessageId++;
                             }
-
                             break;
+
                         case "LIST":
-                            String totalMes = listMessages(whiteboard);
-                            if (totalMes.isEmpty()) { // se la length == 0 vuol dire che non c'è nulla, quindi la
-                                                      // whiteboard è vuote e quindi BOARD: END
+                            String totalMessages = listMessages(whiteboard);
+                            if (totalMessages.isEmpty()) {
                                 out.println("BOARD: END");
                             } else {
-                                out.println(listMessages(whiteboard));
-
+                                out.println("BOARD:");
+                                out.print(totalMessages);
+                                out.println("END");
                             }
                             break;
+
                         case "DEL":
-                            if (command[1].isEmpty()) { // se la length == 0 vuol dire che non c'è nulla, quindi ERR SYNTAX
+                            if (command.length < 2) {
                                 out.println("ERR SYNTAX");
-                            } else if (integerElementAlreadyExistsIn(ids)) {
-                                out.println("ERR NOTFOUND");
                             } else {
+                                try {
+                                    int messageId = Integer.parseInt(command[1]);
+                                    boolean messageFound = false;
 
-                                delMessage(message, whiteboard);
-                                out.println("OK DELETED");
+                                    for (Message m : whiteboard) {
+                                        if (m.getId() == messageId && m.getAuthor().equals(login)) {
+                                            delMessage(messageId, whiteboard);
+                                            out.println("OK DELETED");
+                                            messageFound = true;
+                                            break;
+                                        }
+                                    }
+                                    if (!messageFound) {
+                                        out.println("ERR PERMISSION");
+                                    }
+                                } catch (NumberFormatException e) {
+                                    out.println("ERR SYNTAX");
+                                }
                             }
                             break;
+
                         case "QUIT":
                             out.println("BYE");
+                            loggedInUsers.remove(login);
                             clientSocket.close();
-                            break;
+                            return;
+
                         default:
-                            out.println("ERR UNKNOWNCMD"); // se nessuno dei comandi listati è inserito:
+                            out.println("ERR UNKNOWNCMD");
                             break;
                     }
-
                 }
 
             } catch (IOException e) {
